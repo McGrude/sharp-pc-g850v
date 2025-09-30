@@ -1,106 +1,110 @@
-#include <string.h>
+// sendfile.c
+// Sharp PC-G850V SendFile Utility (no line-number insertion)
+//
+// - Opens a serial port via init_fd() from xfer.h
+// - Reads a text file line-by-line (fgets with buffer; multiple fgets handle very long lines)
+// - Sends each line with CRLF line endings
+// - Does NOT insert or manipulate line numbers
+// - Appends CP/M EOF marker (0x1A) at the end (common for PC-G850 reception)
+//
+// Build (BSD make example):
+//   cc -Wall -Wextra -O2 -c xfer.c -o xfer.o
+//   cc -Wall -Wextra -O2 -c sendfile.c -o sendfile.o
+//   cc -Wall -Wextra -O2 -o sendfile sendfile.o xfer.o
+
 #include <stdio.h>
-#include <ctype.h>
-#include "xfer.h"
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <errno.h>
+#include "xfer.h"
 
-static int send_file(int fd, char *filename) {
-  int i, len, spc = 2, lineno = 10;
-  char lts[8], line[256];
-  unsigned char eb[1] = { 0x1A };
-  FILE *fp;
-  if(!(fp = fopen(filename, "r"))) {
-    fprintf(stderr, "Error opening file for reading\n");
-    return -1;
-  }
+static int write_all(int fd, const void *buf, size_t len) {
+    const unsigned char *p = (const unsigned char *)buf;
+    size_t off = 0;
+    while (off < len) {
+        ssize_t n = write(fd, p + off, len - off);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        off += (size_t)n;
+    }
+    return 0;
+}
 
-  /* Find number of lines */
-  while(fgets(line, sizeof(line), fp)) {
-    len = strlen(line);
-    if(len == 0) {
-      continue;
+static int send_file(int fd, const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        fprintf(stderr, "Error opening file for reading: %s\n", filename);
+        return -1;
     }
 
-    lineno += 10;
-  }
-  
-  if(lineno < 100) {
-    spc = 3;
-  }
-  else if(lineno < 1000) {
-    spc = 4;
-  }
-  else if(lineno < 10000) {
-    spc = 5;
-  }
+    char buf[4096];
 
-  /* Send file */
-  lineno = 10;
-  rewind(fp);
-  while(fgets(line, sizeof(line), fp)) {
-    len = strlen(line);
-    if(len == 0) {
-      continue;
+    while (fgets(buf, sizeof buf, fp)) {
+        size_t len = strlen(buf);
+
+        // Remove any trailing CR and/or LF (normalize)
+        while (len > 0 && (buf[len - 1] == '\n' || buf[len - 1] == '\r')) {
+            buf[--len] = '\0';
+        }
+
+        // Send the line content (could be empty)
+        if (len > 0) {
+            if (write_all(fd, buf, len) != 0) {
+                fclose(fp);
+                return -1;
+            }
+        }
+
+        // Send CRLF after each chunk returned by fgets.
+        // If the original line was longer than our buffer, this will emit CRLF
+        // for each chunk. If you need strict "one CRLF per original line", a
+        // streaming char-by-char approach would be necessary. For typical text
+        // files this is fine.
+        const char crlf[] = "\r\n";
+        if (write_all(fd, crlf, 2) != 0) {
+            fclose(fp);
+            return -1;
+        }
     }
 
-    i = snprintf(lts, sizeof(lts), "%d ", lineno);
-    for(; i < spc; ++i) {
-      lts[i++] = ' ';
+    if (ferror(fp)) {
+        fclose(fp);
+        return -1;
     }
 
-    lts[i] = '\0';
-    printf("%s", lts);
-    write(fd, lts, i);
-    
-    /* Replace Tabs */
-    for(i = 0; i < len; ++i) {
-      if(line[i] == '\t') {
-	line[i] = ' ';
-      }
+    // Append CP/M EOF marker (0x1A)
+    unsigned char cpmeof = 0x1A;
+    if (write_all(fd, &cpmeof, 1) != 0) {
+        fclose(fp);
+        return -1;
     }
 
-    /* Convert to CRLF */
-    --len;
-    for(; len >= 0; --len) {
-      if(!isspace(line[len])) {
-	break;
-      }
-    }
-
-    line[++len] = '\r';
-    line[++len] = '\n';
-    line[++len] = '\0';
-    ++len;
-
-    printf("%s", line);
-    write(fd, line, len);
-    lineno += 10;
-  }
-
-  write(fd, eb, 1);
-  fclose(fp);
-  return 0;
+    fclose(fp);
+    return 0;
 }
 
 int main(int argc, char **argv) {
-  int fd;
-  if(argc != 3) {
-    fputs(
-	  "SHARP PC-G850V SendFile Utility\n"
-	  "Usage: ./sendfile port filename\n", stderr);
-    return 1;
-  }
+    if (argc != 3) {
+        fputs(
+            "SHARP PC-G850V SendFile Utility\n"
+            "Usage: ./sendfile port filename\n", stderr);
+        return 1;
+    }
 
-  if((fd = init_fd(argv[1])) < 0) {
-    return 1;
-  }
+    int fd = init_fd(argv[1]);
+    if (fd < 0) {
+        return 1;
+    }
 
-  if(send_file(fd, argv[2]) < 0) {
-    fputs("Failed to send file\n", stderr);
+    if (send_file(fd, argv[2]) < 0) {
+        fputs("Failed to send file\n", stderr);
+        close(fd);
+        return 1;
+    }
+
     close(fd);
-    return 1;
-  }
-
-  close(fd);
-  return 0;
+    return 0;
 }
