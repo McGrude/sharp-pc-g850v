@@ -21,10 +21,6 @@ A BSD-make–compatible `Makefile` is provided. If you are using the version tha
 # Clean build
 make clean
 
-# If your receiver source file is named recvfile.c:
-make RECV_SRC=recvfile.c
-
-# Otherwise it defaults to recvfile-fixed2.c
 make
 ```
 

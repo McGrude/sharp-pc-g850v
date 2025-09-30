@@ -10,11 +10,6 @@ CFLAGS?=-Wall -Wextra -O2
 LDFLAGS?=
 TERMINAL_LIBS=-pthread -lncurses -lform
 
-# If you renamed the receiver source, override on the command line:
-#   make RECV_SRC=recvfile.c
-RECV_SRC?=recvfile.c
-RECV_OBJ=${RECV_SRC:R}.o
-
 # Default target
 all: sendfile recvfile terminal
 
@@ -27,7 +22,7 @@ all: sendfile recvfile terminal
 sendfile: sendfile.o xfer.o
 	${CC} ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
 
-recvfile: ${RECV_OBJ} xfer.o
+recvfile: recvfile.o xfer.o
 	${CC} ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
 
 terminal: terminal.o xfer.o
@@ -36,7 +31,7 @@ terminal: terminal.o xfer.o
 # Objects that depend on the serial header
 sendfile.o: sendfile.c xfer.h
 terminal.o: terminal.c xfer.h
-${RECV_OBJ}: ${RECV_SRC} xfer.h
+recvfile.o: recvfile.c xfer.h
 xfer.o: xfer.c xfer.h
 
 clean:
