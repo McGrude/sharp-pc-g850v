@@ -143,4 +143,4 @@ int init_fd(char *port);
 
 ## License
 
-TBD (add your preferred license here).
+MIT
