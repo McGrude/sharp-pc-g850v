@@ -1,6 +1,8 @@
+#include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-#include "xfer.c"
+#include "xfer.h"
+#include <unistd.h>
 
 static int send_file(int fd, char *filename) {
   int i, len, spc = 2, lineno = 10;

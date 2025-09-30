@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <ctype.h>
-#include "xfer.c"
+#include "xfer.h"
 
 static int recv_file(int fd, char *filename) {
   int i, n, len, dig, nd;

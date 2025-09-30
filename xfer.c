@@ -3,8 +3,9 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdio.h>
 
-static int set_interface_attribs(int fd, int speed, int parity) {
+int set_interface_attribs(int fd, int speed, int parity) {
   struct termios tty;
   if(tcgetattr(fd, &tty) != 0) {
     fprintf(stderr, "(tcgetattr) Error %d\n", errno);
@@ -31,7 +32,7 @@ static int set_interface_attribs(int fd, int speed, int parity) {
   return 0;
 }
 
-static int set_blocking(int fd, int should_block) {
+int set_blocking(int fd, int should_block) {
   struct termios tty;
   memset(&tty, 0, sizeof tty);
   if(tcgetattr(fd, &tty) != 0) {
@@ -47,7 +48,7 @@ static int set_blocking(int fd, int should_block) {
   return 0;
 }
 
-static int init_fd(char *port) {
+int init_fd(char *port) {
   int fd = open(port, O_RDWR | O_NOCTTY | O_SYNC);
   if(fd < 0) {
     printf("(open) Error %d: %s\n", errno, strerror(errno));
