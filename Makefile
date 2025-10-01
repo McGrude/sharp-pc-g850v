@@ -1,38 +1,39 @@
-# BSD make Makefile for Sharp PC-G850V tools
-# Usage:
-#   make                    # build all
-#   make clean
-#   make RECV_SRC=recvfile.c
+# Portable Makefile for Sharp PC-G850V tools
+# Works with GNU make (macOS default) and BSD make (FreeBSD bmake) by using
+# explicit compile/link commands only.
 
-# Toolchain (FreeBSD: /usr/bin/cc -> clang)
 CC?=cc
 CFLAGS?=-Wall -Wextra -O2
 LDFLAGS?=
-TERMINAL_LIBS=-pthread -lncurses -lform
+TERMINAL_LIBS?=-pthread -lncurses -lform
 
-# Default target
 all: sendfile recvfile terminal
 
-# Suffix rules
-.SUFFIXES: .c .o
-.c.o:
-	${CC} ${CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
-
-# Programs
+# --- Link rules ---
 sendfile: sendfile.o xfer.o
-	${CC} ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
+	$(CC) $(CFLAGS) $(LDFLAGS) -o sendfile sendfile.o xfer.o
 
 recvfile: recvfile.o xfer.o
-	${CC} ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
+	$(CC) $(CFLAGS) $(LDFLAGS) -o recvfile recvfile.o xfer.o
 
 terminal: terminal.o xfer.o
-	${CC} ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC} ${TERMINAL_LIBS}
+	$(CC) $(CFLAGS) $(LDFLAGS) -o terminal terminal.o xfer.o $(TERMINAL_LIBS)
 
-# Objects that depend on the serial header
+# --- Compile rules (explicit) ---
 sendfile.o: sendfile.c xfer.h
-terminal.o: terminal.c xfer.h
-recvfile.o: recvfile.c xfer.h
-xfer.o: xfer.c xfer.h
+	$(CC) $(CFLAGS) -c sendfile.c -o sendfile.o
 
+recvfile.o: recvfile.c xfer.h
+	$(CC) $(CFLAGS) -c recvfile.c -o recvfile.o
+
+xfer.o: xfer.c xfer.h
+	$(CC) $(CFLAGS) -c xfer.c -o xfer.o
+
+terminal.o: terminal.c xfer.h
+	$(CC) $(CFLAGS) -c terminal.c -o terminal.o
+
+# --- Housekeeping ---
+.PHONY: all clean
 clean:
 	rm -f sendfile recvfile terminal *.o
+
